@@ -12,9 +12,9 @@ D1データベース(`cspj-manage-db`)・R2バケット(`cspj-manage-media`)は�
 コードには **SELECT / R2 `get()` 以外の操作(INSERT・UPDATE・DELETE・R2の`put`/`delete`)
 を一切実装しません**(`test/no-write-operations.test.mjs` で回帰確認しています)。
 
-> **現状(2026-09時点)**: ローカル実装・ローカルテストの段階です。Cloudflare上への
-> 実リソース作成・custom domain追加・`wrangler deploy`・git remote/GitHub repository作成・
-> commit/pushはまだ行っていません。
+> **現状(2026-09時点)**: 実装・ローカルテスト・GitHub repository(`api.CSPJ_HP`)への
+> commit/pushは完了しています。Cloudflare上への実リソース作成・custom domain追加・
+> `wrangler deploy`は未実施です(準備・確認中)。
 
 ## 提供endpoint
 
@@ -200,13 +200,16 @@ Cache-Controlヘッダーの形を確認する目的では問題ありません�
 
 ## Cloudflare上でのデプロイ(未実施)
 
-以下は今回のフェーズでは行っていません:
+以下はまだ行っていません:
 
-- git remote作成・GitHub repository作成・commit・push
 - `wrangler deploy`(Worker production作成)
 - `api.cs-pj.com` custom domainの作成
 - remote D1への書き込み(そもそも本APIはremote D1へ書き込みを行いません)
 - `cspj-manage` / `CSPJ_HP` 側の変更
+
+完了済み:
+
+- git remote作成・GitHub repository(`api.CSPJ_HP`)作成・commit・push
 
 ## 関連プロジェクト
 
