@@ -1,0 +1,33 @@
+name = "cspj-public-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# cspj-manage側で既に作成済みのD1データベースを、読み取り専用の用途で共有バインドする。
+# database_id は cspj-manage/wrangler.toml の値をそのまま転記しているだけで、
+# 新規D1リソースはこのprojectでは作成しない。
+# 【重要】本Worker配下のコードにはSELECT以外(INSERT/UPDATE/DELETE)を一切実装しない。
+[[d1_databases]]
+binding = "DB"
+database_name = "cspj-manage-db"
+database_id = "f6d69ca4-9174-425f-94fb-2b91fab2c666"
+
+# cspj-manage側で既に作成済みのR2バケット(private運用)を共有バインドする。
+# bucket自体は今回もpublicにしない。配信は必ず本Worker経由(公開条件を都度再確認した
+# うえでのstream)のみとし、bucket.put/bucket.deleteは一切実装しない。
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "cspj-manage-media"
+
+# api.cs-pj.com への割り当て。custom_domain=true により、初回 `wrangler deploy` 実行時に
+# DNSレコード作成〜Workerへの紐付けまでが自動的に行われる想定
+# (cs-pj.comゾーンが同一Cloudflareアカウント内にあることが前提)。
+# 【重要】custom_domain=true の場合、patternはホスト名のみを指定する
+# (ワイルドカード「/*」やパスは指定できない。`wrangler dev` 起動時のバリデーションで
+#  実際にエラーになることを確認して修正した)。
+# 【現段階では未deployのため未反映。今回のフェーズでは参照しない】
+[[routes]]
+pattern = "api.cs-pj.com"
+custom_domain = true
+
+# Cloudflare Access関連のvars([vars] ACCESS_TEAM_DOMAIN / ACCESS_AUD 等)は
+# このWorkerには意図的に一切定義しない(Public APIは認証なしの前提のため)。
