@@ -72,3 +72,51 @@ export function preflightResponse() {
 export function cacheHeaders(seconds) {
   return { 'Cache-Control': `public, max-age=${seconds}, s-maxage=${seconds}` };
 }
+
+/* ============================================================
+   Contact API(POST /v1/contact)専用のCORS/メソッド応答
+   ------------------------------------------------------------
+   既存の公開GET API(corsHeaders/withCors/preflightResponse、Allow-Origin: '*')には
+   一切手を加えない。Contact APIは外部入力を書き込むエンドポイントであるため、
+   利用元を公式サイト(https://cs-pj.com)のみに限定した専用のCORS設定を持つ。
+   ただしCORSはあくまで補助的な防御であり、本体の防御はvalidation/Turnstile/
+   Rate Limiting(Cloudflare側)とする。
+   ============================================================ */
+
+/** Contact POSTの利用を許可するorigin。現時点ではcs-pj.comのみ
+ *  (www.cs-pj.comは常にcs-pj.comへ301リダイレクトされ、そのoriginからfetchが
+ *  発生することはないため含めていない)。 */
+const CONTACT_ALLOWED_ORIGIN = 'https://cs-pj.com';
+
+export function contactCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': CONTACT_ALLOWED_ORIGIN,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    Vary: 'Origin',
+  };
+}
+
+/** withCors() のContact版。既存のwithCors()同様、bodyを読み取らずヘッダーのみ付与する。 */
+export function withContactCors(response) {
+  const headers = new Headers(response.headers);
+  const cors = contactCorsHeaders();
+  for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+  return new Response(response.body, { status: response.status, headers });
+}
+
+/** Contact用CORSプリフライト(OPTIONS)応答。 */
+export function contactPreflightResponse() {
+  return new Response(null, { status: 204, headers: contactCorsHeaders() });
+}
+
+/**
+ * /v1/contact へPOST以外のメソッド(GET/PUT/PATCH/DELETE等)が来た場合の応答。
+ * 既存の公開GET APIとは異なり、こちらは405で統一する(ご指定の方針)。
+ */
+export function methodNotAllowed() {
+  return json({ error: 'Method Not Allowed' }, 405, {
+    'Cache-Control': 'no-store',
+    Allow: 'POST, OPTIONS',
+  });
+}

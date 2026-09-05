@@ -4,17 +4,27 @@
  *
  * cspj-manage側のテストで確立した「実SQLをそのまま実クエリとして流し込み、
  * 正規表現で対象テーブル/条件を判定してJSでフィルタする」という手法を踏襲する。
- * フルのSQLパーサではなく、src/lib/db.js・src/lib/media.js が実際に発行する
- * 既知のクエリ形だけを対象にした、意図的に単純な作り。
+ * フルのSQLパーサではなく、src/lib/db.js・src/lib/media.js・src/lib/contact-db.js が
+ * 実際に発行する既知のクエリ形だけを対象にした、意図的に単純な作り。
  *
  * 【重要】"now" は固定文字列で受け取る(実行時刻に依存させない)。
  * DB保存形式("YYYY-MM-DD HH:MM:SS")はゼロ埋め固定長のため、文字列としての
  * 大小比較がそのまま時系列の前後関係と一致する(SQLite側のdatetime比較と同じ性質)。
+ *
+ * 【2026-09 Contact API追加】run()は、Public APIが全編SELECTのみだった間は
+ * 「呼ばれたら即エラー」で書き込みゼロを保証していたが、Contact APIの追加により
+ * contact_submissions への INSERT だけは正当な書き込みになった。そのため run() は
+ * 「INSERT INTO contact_submissions」のときだけ実際にfixtures.contact_submissionsへ
+ * 反映し、それ以外(他テーブルへのINSERT、UPDATE、DELETE等)は従来通り例外を投げる
+ * ことで、書き込み範囲がcontact_submissionsだけに限定されていることをテストで
+ * 確認できるようにしている。
  */
 
 export function createMockD1(fixtures, options = {}) {
   const now = options.now || '2026-09-04 12:00:00';
+  const forceRunError = Boolean(options.forceRunError);
   let writeAttempted = false;
+  const writeLog = [];
 
   function prepare(sql) {
     const normalized = sql.replace(/\s+/g, ' ').trim();
@@ -33,8 +43,31 @@ export function createMockD1(fixtures, options = {}) {
         return { results: rows };
       },
       async run() {
+        // "D1 INSERT失敗"のテスト用: D1側の障害(接続断・容量超過等)をシミュレートする。
+        if (forceRunError) {
+          throw new Error('Mock D1: simulated D1 failure(テスト用)');
+        }
+
+        if (/^INSERT INTO contact_submissions\b/i.test(normalized)) {
+          writeAttempted = true;
+          const [
+            contact_id, name, email, category, sns_url, message,
+            privacy_consent, privacy_policy_version,
+          ] = boundArgs;
+          const row = {
+            contact_id, name, email, category, sns_url, message,
+            privacy_consent, privacy_policy_version, status: 'new',
+          };
+          writeLog.push({ table: 'contact_submissions', row });
+          (fixtures.contact_submissions ||= []).push(row);
+          return { success: true };
+        }
+
         writeAttempted = true;
-        throw new Error('Mock D1: run()(書き込み)はサポートしていません。Public APIはSELECTのみのはずです。');
+        writeLog.push({ table: null, sql: normalized, rejected: true });
+        throw new Error(
+          'Mock D1: run()(書き込み)は contact_submissions へのINSERT以外サポートしていません。'
+        );
       },
     };
   }
@@ -141,6 +174,10 @@ export function createMockD1(fixtures, options = {}) {
     prepare,
     get writeAttempted() {
       return writeAttempted;
+    },
+    /** 発生した書き込み(許可されたものも拒否されたものも含む)の記録。テスト検証用。 */
+    get writeLog() {
+      return writeLog.slice();
     },
   };
 }

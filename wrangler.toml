@@ -2,10 +2,14 @@ name = "cspj-public-api"
 main = "src/index.js"
 compatibility_date = "2026-01-01"
 
-# cspj-manage側で既に作成済みのD1データベースを、読み取り専用の用途で共有バインドする。
+# cspj-manage側で既に作成済みのD1データベースを共有バインドする。
 # database_id は cspj-manage/wrangler.toml の値をそのまま転記しているだけで、
-# 新規D1リソースはこのprojectでは作成しない。
-# 【重要】本Worker配下のコードにはSELECT以外(INSERT/UPDATE/DELETE)を一切実装しない。
+# 新規D1リソースはこのprojectでは作成しない。schema/migrationの正本は
+# cspj-manage(manage.CSPJ_HP)側であり、本リポジトリにmigrationsディレクトリは作らない。
+# 【重要】GET系公開API(/v1/djs/* /v1/media/*)のコードにはSELECT以外
+# (INSERT/UPDATE/DELETE)を一切実装しない。2026-09追加のContact API
+# (POST /v1/contact)のみ例外で、contact_submissionsテーブルへのINSERTだけを
+# src/lib/contact-db.js に実装している(詳細はREADME.md「Contact API」章参照)。
 [[d1_databases]]
 binding = "DB"
 database_name = "cspj-manage-db"
@@ -24,10 +28,17 @@ bucket_name = "cspj-manage-media"
 # 【重要】custom_domain=true の場合、patternはホスト名のみを指定する
 # (ワイルドカード「/*」やパスは指定できない。`wrangler dev` 起動時のバリデーションで
 #  実際にエラーになることを確認して修正した)。
-# 【現段階では未deployのため未反映。今回のフェーズでは参照しない】
+# 【デプロイ済み】2026-09、DNSの*.cs-pj.comワイルドカードレコードより優先される
+# 完全一致のCustom Domainとして反映済み。
 [[routes]]
 pattern = "api.cs-pj.com"
 custom_domain = true
 
 # Cloudflare Access関連のvars([vars] ACCESS_TEAM_DOMAIN / ACCESS_AUD 等)は
 # このWorkerには意図的に一切定義しない(Public APIは認証なしの前提のため)。
+
+# Contact API(POST /v1/contact)が使う TURNSTILE_SECRET_KEY は、Worker Secretとして
+# 別途設定する(値そのものをここやGit・READMEへ書き込まない)。
+#   npx wrangler secret put TURNSTILE_SECRET_KEY
+# 未設定の場合、Contact APIはfail closed(常に403、D1への保存なし)で動作する
+# (src/lib/turnstile.js / src/handlers/contact.js 参照)。
