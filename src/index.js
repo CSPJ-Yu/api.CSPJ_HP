@@ -22,7 +22,7 @@
  * には触れていない。
  */
 import { djIndex, djEvents, djNews, djSocialLinks, djPopup, djSite } from './handlers/djs.js';
-import { mediaEvent, mediaNews, mediaPopup } from './handlers/media.js';
+import { mediaEvent, mediaNews, mediaPopup, mediaDj } from './handlers/media.js';
 import { contactPost } from './handlers/contact.js';
 import {
   withCors,
@@ -46,6 +46,8 @@ const ROUTES = [
   { pattern: new URLPattern({ pathname: '/v1/media/events/:recordId/:file' }), handler: mediaEvent },
   { pattern: new URLPattern({ pathname: '/v1/media/news/:recordId/:file' }), handler: mediaNews },
   { pattern: new URLPattern({ pathname: '/v1/media/popups/:recordId/:file' }), handler: mediaPopup },
+  // Portal Card Image。recordIdはdj_idではなくslug(既存方針通りdj_idは非公開のため)。
+  { pattern: new URLPattern({ pathname: '/v1/media/djs/:recordId/:file' }), handler: mediaDj },
 ];
 
 const CONTACT_PATH = '/v1/contact';

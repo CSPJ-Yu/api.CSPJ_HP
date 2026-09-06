@@ -9,9 +9,25 @@ export const NOW = '2026-09-04 12:00:00';
 
 export const fixtures = {
   djs: [
-    { dj_id: 'dj-1', slug: 'yu-x', display_name: 'YU-X', status: 'active' },
+    {
+      dj_id: 'dj-1',
+      slug: 'yu-x',
+      display_name: 'YU-X',
+      status: 'active',
+      portal_card_image_key: 'portal-cards/dj-1/eeee-5555.jpg',
+    },
+    // other-djはportal_card_image_key未設定(portal_card_image_url: nullのケース用)
     { dj_id: 'dj-2', slug: 'other-dj', display_name: 'OTHER DJ', status: 'active' },
-    { dj_id: 'dj-3', slug: 'inactive-dj', display_name: 'INACTIVE DJ', status: 'inactive' },
+    // inactive-djはあえてportal_card_image_keyを設定しR2にも実体を置く。
+    // 「inactiveならkey/R2実体があっても取得不可」を確認するため
+    // (ev-draft-with-imageと同じ考え方)。
+    {
+      dj_id: 'dj-3',
+      slug: 'inactive-dj',
+      display_name: 'INACTIVE DJ',
+      status: 'inactive',
+      portal_card_image_key: 'portal-cards/dj-3/ffff-6666.jpg',
+    },
   ],
 
   events: [
@@ -204,4 +220,7 @@ export const r2Objects = {
   'flyers/dj-1/ev-draft-with-image/bbbb-2222.jpg': { body: 'FAKE-JPEG-BYTES-DRAFT', contentType: 'image/jpeg' },
   'news/dj-1/news-published-past/cccc-3333.jpg': { body: 'FAKE-JPEG-BYTES-NEWS', contentType: 'image/jpeg' },
   'popup/dj-1/popup-active/dddd-4444.jpg': { body: 'FAKE-JPEG-BYTES-POPUP', contentType: 'image/jpeg' },
+  'portal-cards/dj-1/eeee-5555.jpg': { body: 'FAKE-JPEG-BYTES-PORTAL-CARD', contentType: 'image/jpeg' },
+  // inactive-dj用。「R2に実体があってもinactiveなら404」を確認するためのデータ。
+  'portal-cards/dj-3/ffff-6666.jpg': { body: 'FAKE-JPEG-BYTES-PORTAL-CARD-INACTIVE', contentType: 'image/jpeg' },
 };

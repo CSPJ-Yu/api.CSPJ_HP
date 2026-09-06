@@ -29,10 +29,10 @@ import { json, notFound, cacheHeaders } from '../lib/response.js';
 const CACHE_SECONDS = 60;
 
 /** GET /v1/djs/:slug */
-export async function djIndex({ slug }, env) {
+export async function djIndex({ slug }, env, origin) {
   const dj = await getActiveDjBySlug(env.DB, slug);
   if (!dj) return notFound();
-  return json(serializeDj(dj), 200, cacheHeaders(CACHE_SECONDS));
+  return json(serializeDj(dj, origin), 200, cacheHeaders(CACHE_SECONDS));
 }
 
 /** GET /v1/djs/:slug/events */
@@ -85,7 +85,7 @@ export async function djSite({ slug }, env, origin) {
 
   return json(
     {
-      dj: serializeDj(dj),
+      dj: serializeDj(dj, origin),
       events: events.map((row) => serializeEvent(row, origin)),
       news: news.map((row) => serializeNewsItem(row, origin)),
       social_links: socialLinks.map(serializeSocialLink),

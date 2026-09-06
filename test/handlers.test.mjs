@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { djIndex, djEvents, djNews, djSocialLinks, djPopup, djSite } from '../src/handlers/djs.js';
-import { mediaEvent, mediaNews, mediaPopup } from '../src/handlers/media.js';
+import { mediaEvent, mediaNews, mediaPopup, mediaDj } from '../src/handlers/media.js';
 import { createMockD1 } from './mock-d1.js';
 import { createMockR2 } from './mock-r2.js';
 import { fixtures, r2Objects, NOW } from './fixtures.js';
@@ -26,12 +26,28 @@ function makeEnv() {
 
 // ---- /v1/djs/:slug ----------------------------------------------------
 
-test('djIndex: activeなDJは200', async () => {
+test('djIndex: activeなDJは200(portal_card_image_urlを含む)', async () => {
   const res = await djIndex({ slug: 'yu-x' }, makeEnv(), ORIGIN);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('Cache-Control'), 'public, max-age=60, s-maxage=60');
   const body = await res.json();
-  assert.deepEqual(body, { slug: 'yu-x', display_name: 'YU-X' });
+  assert.deepEqual(body, {
+    slug: 'yu-x',
+    display_name: 'YU-X',
+    portal_card_image_url: `${ORIGIN}/v1/media/djs/yu-x/eeee-5555.jpg`,
+  });
+});
+
+test('djIndex: portal_card_image_key未設定のDJはportal_card_image_url: null', async () => {
+  const res = await djIndex({ slug: 'other-dj' }, makeEnv(), ORIGIN);
+  const body = await res.json();
+  assert.equal(body.portal_card_image_url, null);
+});
+
+test('djIndex: レスポンスにportal_card_image_key自体は含まれない', async () => {
+  const res = await djIndex({ slug: 'yu-x' }, makeEnv(), ORIGIN);
+  const body = await res.json();
+  assert.equal('portal_card_image_key' in body, false);
 });
 
 test('djIndex: inactiveなDJは404', async () => {
@@ -182,4 +198,41 @@ test('mediaPopup: 有効な公開中POPUPの画像は200、期限切れは404', 
   // ここでは「期限切れなら公開条件を満たさずD1側でヒットしない」ことも別途確認する。
   const expiredRes = await mediaPopup({ recordId: 'popup-expired', file: 'anything.jpg' }, makeEnv());
   assert.equal(expiredRes.status, 404);
+});
+
+// ---- /v1/media/djs/:recordId/:file(Portal Card Image) ---------------------
+
+test('mediaDj: activeなDJ + 画像ありは200・Content-Type付き', async () => {
+  const res = await mediaDj({ recordId: 'yu-x', file: 'eeee-5555.jpg' }, makeEnv());
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('Content-Type'), 'image/jpeg');
+  assert.equal(res.headers.get('X-Content-Type-Options'), 'nosniff');
+  assert.equal(res.headers.get('Cache-Control'), 'public, max-age=60, s-maxage=60');
+  assert.equal(await res.text(), 'FAKE-JPEG-BYTES-PORTAL-CARD');
+});
+
+test('mediaDj: activeなDJ + 画像未設定は404', async () => {
+  const res = await mediaDj({ recordId: 'other-dj', file: 'anything.jpg' }, makeEnv());
+  assert.equal(res.status, 404);
+});
+
+test('mediaDj: 存在しないslugは404', async () => {
+  const res = await mediaDj({ recordId: 'nonexistent-slug', file: 'x.jpg' }, makeEnv());
+  assert.equal(res.status, 404);
+});
+
+test('mediaDj: inactiveなDJは、R2に実体・D1にkeyがあっても404(portal_card_image_urlを直接叩いても取得不可)', async () => {
+  const res = await mediaDj({ recordId: 'inactive-dj', file: 'ffff-6666.jpg' }, makeEnv());
+  assert.equal(res.status, 404);
+});
+
+test('mediaDj: version不一致は404', async () => {
+  const res = await mediaDj({ recordId: 'yu-x', file: 'wrong-version.jpg' }, makeEnv());
+  assert.equal(res.status, 404);
+});
+
+test('mediaDj: R2に実体が無い(孤立参照)場合も404', async () => {
+  const envNoR2Object = { DB: createMockD1(fixtures, { now: NOW }), MEDIA: createMockR2({}) };
+  const res = await mediaDj({ recordId: 'yu-x', file: 'eeee-5555.jpg' }, envNoR2Object);
+  assert.equal(res.status, 404);
 });

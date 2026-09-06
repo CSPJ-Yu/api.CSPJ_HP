@@ -12,7 +12,7 @@ import { notFound } from '../lib/response.js';
 const MEDIA_CACHE_SECONDS = 60;
 
 /**
- * @param {string} kind 'events' | 'news' | 'popups'
+ * @param {string} kind 'events' | 'news' | 'popups' | 'djs'
  * @returns {(params: {recordId: string, file: string}, env: object) => Promise<Response>}
  */
 function createMediaHandler(kind) {
@@ -36,3 +36,5 @@ function createMediaHandler(kind) {
 export const mediaEvent = createMediaHandler('events');
 export const mediaNews = createMediaHandler('news');
 export const mediaPopup = createMediaHandler('popups');
+// Portal Card Image(/portal/dj/ のDJカード用)。recordIdはdj_idではなくslug。
+export const mediaDj = createMediaHandler('djs');

@@ -10,15 +10,22 @@
  *
  * 以下は本ファイルのどの関数の戻り値にも一切含めない:
  *   dj_id / image_key / flyer_key / account_status / users情報 / status /
- *   created_at / updated_at / link_id / sort_order / memo / Access関連情報
+ *   created_at / updated_at / link_id / sort_order / memo / Access関連情報 /
+ *   portal_card_image_key(R2 object key。公開するのは組み立て済みURLのみ)
  */
 import { buildMediaUrl } from './media.js';
 
-/** djs行 → 公開DJ情報。slug/display_nameのみ。 */
-export function serializeDj(dj) {
+/**
+ * djs行 → 公開DJ情報。slug/display_name/portal_card_image_urlのみ。
+ * portal_card_image_key(R2 object key)そのものは絶対に含めない — 公開するのは
+ * buildMediaUrl()で組み立てた完成済みURL(portal_card_image_url)のみ。
+ * 画像未設定(portal_card_image_keyがnull)の場合はportal_card_image_url: null。
+ */
+export function serializeDj(dj, origin) {
   return {
     slug: dj.slug,
     display_name: dj.display_name,
+    portal_card_image_url: buildMediaUrl(origin, 'djs', dj.slug, dj.portal_card_image_key),
   };
 }
 

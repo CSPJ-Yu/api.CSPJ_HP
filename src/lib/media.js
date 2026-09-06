@@ -8,8 +8,9 @@
  * それ以外(prefix・dj_id部分)は一切外部へ出さない設計にする。
  *
  * 画像URLの形: https://api.cs-pj.com/v1/media/<kind>/<record_id>/<uuid>.<ext>
- *   - <kind>       … 'events' | 'news' | 'popups'
- *   - <record_id>  … event_id / news_id / popup_id(元々公開情報として返している値そのもの)
+ *   - <kind>       … 'events' | 'news' | 'popups' | 'djs'
+ *   - <record_id>  … event_id / news_id / popup_id / slug(元々公開情報として返している値そのもの。
+ *                     'djs'の場合はdj_idではなくslugを使う — dj_idは既存方針通り非公開のため)
  *   - <uuid>.<ext> … image_keyの末尾セグメントのみ(dj_id等の内部情報は含まれない)
  */
 
@@ -70,6 +71,14 @@ export async function resolveAndStreamMedia(kind, recordId, requestedFile, env) 
         `SELECT image_key FROM popups
          WHERE popup_id = ? AND status = 'published' AND expires_at IS NOT NULL AND expires_at > datetime('now')`
       )
+      .bind(recordId)
+      .first();
+  } else if (kind === 'djs') {
+    // Portal Card Image。recordIdはslug(dj_idではない。GET /v1/djs/:slugと同じ
+    // 公開条件(status='active')をここでも独立に再確認する — /v1/djs/:slug側の
+    // 判定結果を信用して素通しすることはしない(他kindと同じ設計)。
+    row = await db
+      .prepare("SELECT portal_card_image_key AS image_key FROM djs WHERE slug = ? AND status = 'active'")
       .bind(recordId)
       .first();
   } else {

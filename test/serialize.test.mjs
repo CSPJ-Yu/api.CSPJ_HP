@@ -30,6 +30,7 @@ const FORBIDDEN_KEYS = [
   'link_id',
   'sort_order',
   'memo',
+  'portal_card_image_key',
 ];
 
 function assertNoForbiddenKeys(obj, label) {
@@ -39,10 +40,18 @@ function assertNoForbiddenKeys(obj, label) {
   }
 }
 
-test('serializeDj: slug/display_nameのみ', () => {
-  const dj = fixtures.djs[0];
-  const out = serializeDj(dj);
-  assert.deepEqual(Object.keys(out).sort(), ['display_name', 'slug']);
+test('serializeDj: slug/display_name/portal_card_image_urlのみ', () => {
+  const dj = fixtures.djs[0]; // yu-x. portal_card_image_key設定済み
+  const out = serializeDj(dj, ORIGIN);
+  assert.deepEqual(Object.keys(out).sort(), ['display_name', 'portal_card_image_url', 'slug'].sort());
+  assertNoForbiddenKeys(out, 'serializeDj');
+  assert.equal(out.portal_card_image_url, `${ORIGIN}/v1/media/djs/yu-x/eeee-5555.jpg`);
+});
+
+test('serializeDj: portal_card_image_keyが無い場合はportal_card_image_url: null', () => {
+  const dj = fixtures.djs.find((d) => d.slug === 'other-dj');
+  const out = serializeDj(dj, ORIGIN);
+  assert.equal(out.portal_card_image_url, null);
   assertNoForbiddenKeys(out, 'serializeDj');
 });
 

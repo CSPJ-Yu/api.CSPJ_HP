@@ -31,6 +31,7 @@ GET  /v1/djs/:slug/site        … 上記4つ(dj/events/news/social_links/popup)
 GET  /v1/media/events/:recordId/:file    … Scheduleのフライヤー画像(recordId=event_id)
 GET  /v1/media/news/:recordId/:file      … NEWSの画像(recordId=news_id)
 GET  /v1/media/popups/:recordId/:file    … POPUPの画像(recordId=popup_id)
+GET  /v1/media/djs/:recordId/:file       … Portal Card Image(recordId=slug。dj_idではない)
 
 POST /v1/contact                          … Contact Form送信受付(下記「Contact API」章参照)
 ```
@@ -42,7 +43,7 @@ POST /v1/contact                          … Contact Form送信受付(下記「
 
 ## API v1 契約(正式仕様)
 
-上記10エンドポイントが、`api.CSPJ_HP`のPublic API v1として確定した全endpointです。
+上記11エンドポイントが、`api.CSPJ_HP`のPublic API v1として確定した全endpointです。
 以下は本READMEの各章で個別に説明している内容の要約であり、v1の契約として明記します。
 
 1. **D1 schema/migrationの正本は`manage.CSPJ_HP`**。`cspj-manage-db`のテーブル定義・
@@ -64,10 +65,10 @@ POST /v1/contact                          … Contact Form送信受付(下記「
    `GET /v1/djs/:slug`は単体取得のみで、一覧取得の手段はv1には含まれません
    (DJポータルページの一覧表示は、`CSPJ_HP`側で当面静的HTMLとして運用します)。
 6. **プロフィール本文(bio)・ジャンル(genre)・活動歴等はv1の正式仕様に含みません**。
-   `GET /v1/djs/:slug`が返すのは`slug`と`display_name`のみです。これはD1の
-   `djs`テーブル自体にこれらの列が存在しないためであり、単なる実装漏れではなく
-   意図的な設計判断です。各DJページのプロフィール本文は、`CSPJ_HP`側で
-   引き続き静的HTMLとして管理します。
+   `GET /v1/djs/:slug`が返すのは`slug`・`display_name`・`portal_card_image_url`のみです。
+   bio/genre等はD1の`djs`テーブル自体にこれらの列が存在しないためv1には含まれず、
+   単なる実装漏れではなく意図的な設計判断です。各DJページのプロフィール本文は、
+   `CSPJ_HP`側で引き続き静的HTMLとして管理します。
 7. **v1では既存のフィールド名・レスポンス構造を破壊的変更しません**。本READMEに
    記載された各endpointのレスポンス形状(フィールド名・型・ネスト構造)は、
    v1である限り後方互換を維持します。フィールドの追加はあり得ますが、既存
@@ -102,7 +103,8 @@ popup         null
 
 ```
 dj_id / image_key / flyer_key / account_status / users情報 / status /
-created_at / updated_at / link_id / sort_order / memo / Access関連情報
+created_at / updated_at / link_id / sort_order / memo / Access関連情報 /
+portal_card_image_key
 ```
 
 Scheduleの `memo`(内部管理メモ)は、`src/lib/db.js` のSELECT文自体に含めていない
@@ -141,6 +143,61 @@ requestedされたversion(:file)と現在のimage_keyの末尾セグメントを
 
 これにより、非公開化・期限切れ後は(URLを知っていても)画像が配信されなくなります。
 また画像差し替え時は`image_key`(≒version)が変わるため、古いURLは自然に404になります。
+
+## Portal Card Image(`GET /v1/djs/:slug` の `portal_card_image_url`)
+
+`CSPJ_HP`の`/portal/dj/`(DJポータルのカード一覧)で使う画像です。Manage側
+(`manage.CSPJ_HP`)で管理される`djs.portal_card_image_key`(R2 object key、形式
+`portal-cards/<dj_id>/<uuid>.<ext>`)を、他の画像(Flyer/NEWS/POPUP)と全く同じ
+安全な配信方式でPublic API経由に橋渡しします。新方式は作らず、既存の
+`/v1/media/*`の設計(kind別ルート・D1再検証・version照合・private R2 stream)を
+そのまま再利用しています。
+
+`GET /v1/djs/:slug`のレスポンスに、新規フィールド`portal_card_image_url`が
+追加されます:
+
+```json
+{
+  "slug": "yu-x",
+  "display_name": "YU-X",
+  "portal_card_image_url": "https://api.cs-pj.com/v1/media/djs/yu-x/<uuid>.<ext>"
+}
+```
+
+- 画像未設定の場合は `"portal_card_image_url": null`
+- `portal_card_image_key`(R2 object key)そのものは**一切レスポンスに含まれません**
+  (`src/lib/serialize.js`のallow-listで明示的に除外)
+- `portal_card_image_url`は`/v1/media/*`の他画像と同じく、そのまま`<img src>`に
+  使える完成済みURLです。`CSPJ_HP`側でR2/D1の内部構造を知る必要はありません
+- URLのoriginは他画像URLと同じく`buildMediaUrl()`(`src/lib/media.js`)経由で
+  リクエストの`new URL(request.url).origin`から組み立てます(Request Headerの
+  `Host`等を無条件に信用する実装ではありません)
+
+配信endpoint: `GET /v1/media/djs/:recordId/:file`(`recordId`は`slug`。**`dj_id`
+ではない** — `dj_id`は既存方針通りPublic APIでは非公開のため)。処理の流れは
+既存`/v1/media/*`と完全に同一です(`src/lib/media.js`の`resolveAndStreamMedia()`
+に`kind='djs'`を追加しただけで、D1再検証・version照合・R2 get・stream応答の
+ロジック自体は他kindと共通のまま変更していません):
+
+```
+slug
+  ↓
+D1で「現在のDJ公開条件」を再確認(status='active'。/v1/djs/:slugと同じ条件を独立に再確認)
+  ↓
+現在のportal_card_image_keyを取得
+  ↓
+requestedされたversion(:file)と現在のkeyの末尾セグメントを比較(不一致なら404)
+  ↓
+一致すればprivate R2から get() してstream
+```
+
+inactive DJ・存在しないslug・画像未設定は、他画像endpointと同じく`404`に統一
+されます(inactive DJの`portal_card_image_key`がD1に残っていても、`status='active'`
+条件を満たさない限り画像は配信されません — `/v1/djs/:slug`本体が404になるのと
+同じ理由です)。Content-Type・`X-Content-Type-Options: nosniff`・Cache-Control
+(`public, max-age=60, s-maxage=60`)も他画像endpointと同一です。
+
+Genre等、Portal専用の他データは今回のスコープ外です(別途対応予定)。
 
 ## Contact API(`POST /v1/contact`)
 
@@ -375,12 +432,13 @@ cspj-public-api/
 │  │  ├─ serialize.js        … allow-list方式のレスポンス整形
 │  │  ├─ response.js         … JSON/404/CORS/Cache-Controlヘルパー(GET系+Contact系)
 │  │  ├─ media.js            … image_url組み立て・再検証付きR2 stream解決
+│  │  │                            (Flyer/NEWS/POPUP/Portal Card Image共通)
 │  │  ├─ contact-validate.js … Contact送信の入力validation(allow-list方式)
 │  │  ├─ turnstile.js        … Cloudflare Turnstileサーバー側検証(fail closed、DI可能)
 │  │  └─ contact-db.js       … 【唯一の書き込み箇所】contact_submissionsへのINSERT
 │  └─ handlers/
-│     ├─ djs.js              … /v1/djs/* の6ハンドラ
-│     ├─ media.js            … /v1/media/* の3ハンドラ
+│     ├─ djs.js              … /v1/djs/* の6ハンドラ(portal_card_image_url含む)
+│     ├─ media.js            … /v1/media/* の4ハンドラ(Flyer/NEWS/POPUP/Portal Card)
 │     └─ contact.js          … POST /v1/contact のハンドラ
 └─ test/
    ├─ mock-d1.js             … Node標準機能のみで書いた簡易D1モック(contact_submissions

@@ -11,10 +11,17 @@
  * NEWS/POPUP実装と同じ、実績のある方式)。JS側でnew Date()を作って比較する経路は持たない。
  */
 
-/** 指定slugのDJが存在し、かつ status='active' の場合のみ返す。それ以外はnull。 */
+/**
+ * 指定slugのDJが存在し、かつ status='active' の場合のみ返す。それ以外はnull。
+ * portal_card_image_key はPortal Card Image(/v1/djs/:slug の portal_card_image_url
+ * 組み立て用)に必要なため取得するが、serialize層でraw keyのままレスポンスへ
+ * 出すことは禁止(lib/serialize.jsのallow-listで除外)。
+ */
 export async function getActiveDjBySlug(db, slug) {
   return db
-    .prepare("SELECT dj_id, slug, display_name FROM djs WHERE slug = ? AND status = 'active'")
+    .prepare(
+      "SELECT dj_id, slug, display_name, portal_card_image_key FROM djs WHERE slug = ? AND status = 'active'"
+    )
     .bind(slug)
     .first();
 }

@@ -75,9 +75,22 @@ export function createMockD1(fixtures, options = {}) {
   function execute(sql, args) {
     if (/\bFROM\s+djs\b/.test(sql)) {
       const [slug] = args;
+      // Portal Card Image用(src/lib/media.js): SELECT portal_card_image_key AS image_key
+      // FROM djs WHERE slug = ? AND status = 'active'。エイリアス "AS image_key" の
+      // 有無で、getActiveDjBySlug用のクエリと区別する(どちらも
+      // "WHERE slug = ? AND status = 'active'" は共通のため)。
+      if (/portal_card_image_key\s+AS\s+image_key/i.test(sql)) {
+        const row = (fixtures.djs || []).find((d) => d.slug === slug && d.status === 'active');
+        return row ? [{ image_key: row.portal_card_image_key || null }] : [];
+      }
       return (fixtures.djs || [])
         .filter((d) => d.slug === slug && d.status === 'active')
-        .map((d) => ({ dj_id: d.dj_id, slug: d.slug, display_name: d.display_name }));
+        .map((d) => ({
+          dj_id: d.dj_id,
+          slug: d.slug,
+          display_name: d.display_name,
+          portal_card_image_key: d.portal_card_image_key || null,
+        }));
     }
 
     if (/\bFROM\s+news_links\b/.test(sql)) {
