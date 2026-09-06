@@ -264,8 +264,10 @@ CREATE INDEX idx_contact_submissions_created_at ON contact_submissions(created_a
 ```
 
 `status`はINSERT時に本Worker側で必ず`'new'`固定(`src/lib/contact-db.js`のSQL文に
-リテラルで埋め込み。クライアント値を使う経路は無い)。将来Manage側で
-`new` / `in_progress` / `replied` / `closed` を管理する想定です。
+リテラルで埋め込み。クライアント値を使う経路は無い)。Manage側(`manage.CSPJ_HP`)で
+`new` / `in_progress` / `resolved` / `archived` の4状態を管理する仕様が確定済みです
+(`manage.CSPJ_HP`の`functions/_lib/contacts.js`の`CONTACT_STATUSES`定数)。これらの
+状態遷移はManage側の内部機能であり、Public APIのレスポンスには一切出しません。
 
 > **⚠️ migrationの管理元について**: `cspj-manage-db`のD1 schema/migrationは
 > **`cspj-manage`(`manage.CSPJ_HP`)リポジトリの`migrations/`が正本**です
