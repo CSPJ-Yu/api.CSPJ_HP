@@ -28,9 +28,9 @@ GET  /v1/djs/:slug/social-links
 GET  /v1/djs/:slug/popup
 GET  /v1/djs/:slug/site        … 上記4つ(dj/events/news/social_links/popup)を一括取得
 
-GET  /v1/media/events/:event_id/:file    … Scheduleのフライヤー画像
-GET  /v1/media/news/:news_id/:file       … NEWSの画像
-GET  /v1/media/popups/:popup_id/:file    … POPUPの画像
+GET  /v1/media/events/:recordId/:file    … Scheduleのフライヤー画像(recordId=event_id)
+GET  /v1/media/news/:recordId/:file      … NEWSの画像(recordId=news_id)
+GET  /v1/media/popups/:recordId/:file    … POPUPの画像(recordId=popup_id)
 
 POST /v1/contact                          … Contact Form送信受付(下記「Contact API」章参照)
 ```
@@ -39,6 +39,40 @@ POST /v1/contact                          … Contact Form送信受付(下記「
 一致しないパスはすべて `404` を返します(`405 Method Not Allowed` は使わない設計です)。
 **`/v1/contact` のみ例外**で、`POST`/`OPTIONS`以外のメソッドには `405` を返します
 (詳細は「Contact API」章)。この2つの方針は完全に独立しており、互いに影響しません。
+
+## API v1 契約(正式仕様)
+
+上記10エンドポイントが、`api.CSPJ_HP`のPublic API v1として確定した全endpointです。
+以下は本READMEの各章で個別に説明している内容の要約であり、v1の契約として明記します。
+
+1. **D1 schema/migrationの正本は`manage.CSPJ_HP`**。`cspj-manage-db`のテーブル定義・
+   migrationファイルは`cspj-manage`(`manage.CSPJ_HP`)リポジトリの`migrations/`が
+   唯一の正本であり、本リポジトリ(`api.CSPJ_HP`)にはmigrationsディレクトリを
+   作成しません。本リポジトリのコードは、必要なテーブルが既に存在する前提で
+   動作します。
+2. **Public APIから許可されるD1書き込みは`contact_submissions`へのINSERTのみ**。
+   それ以外のテーブルへのINSERT、および`contact_submissions`を含むあらゆる
+   UPDATE/DELETE/DDLは一切実装しません(`src/lib/contact-db.js`に集約、
+   `test/no-write-operations.test.mjs`で静的に回帰確認)。
+3. **`GET /v1/djs/*` `GET /v1/media/*` は完全に読み取り専用**です。SELECT /
+   R2 `get()` 以外の操作は一切実装しません。
+4. **レスポンスはallow-list方式で整形します**(`src/lib/serialize.js`)。DB行を
+   `{ ...row }` のように展開することはせず、公開してよいフィールドを1つずつ
+   明示的に列挙します。将来migrationで内部列が追加されても、この関数を明示的に
+   変更しない限り自動的には公開されません(デフォルトで非公開側に倒れる設計)。
+5. **`GET /v1/djs`(DJ一覧を返すendpoint)は現時点では存在しません**。
+   `GET /v1/djs/:slug`は単体取得のみで、一覧取得の手段はv1には含まれません
+   (DJポータルページの一覧表示は、`CSPJ_HP`側で当面静的HTMLとして運用します)。
+6. **プロフィール本文(bio)・ジャンル(genre)・活動歴等はv1の正式仕様に含みません**。
+   `GET /v1/djs/:slug`が返すのは`slug`と`display_name`のみです。これはD1の
+   `djs`テーブル自体にこれらの列が存在しないためであり、単なる実装漏れではなく
+   意図的な設計判断です。各DJページのプロフィール本文は、`CSPJ_HP`側で
+   引き続き静的HTMLとして管理します。
+7. **v1では既存のフィールド名・レスポンス構造を破壊的変更しません**。本READMEに
+   記載された各endpointのレスポンス形状(フィールド名・型・ネスト構造)は、
+   v1である限り後方互換を維持します。フィールドの追加はあり得ますが、既存
+   フィールドの削除・rename・型変更は行いません。破壊的変更が必要になった
+   場合は、`/v1/`とは別のバージョンパス(例: `/v2/`)を新設して対応します。
 
 ## 公開条件
 
@@ -313,6 +347,8 @@ Access-Control-Allow-Methods: GET, OPTIONS
 ```
 Access-Control-Allow-Origin: https://cs-pj.com
 Access-Control-Allow-Methods: POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+Vary: Origin
 ```
 (`www.cs-pj.com` は常に `cs-pj.com` へ301リダイレクトされ、そのoriginから直接fetchが
 発生することは無いため、許可originに含めていません。)
